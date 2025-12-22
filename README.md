@@ -1,5 +1,5 @@
 # projectile-motion-simulation
-A Python-based numerical simulation of projectile motion with linear and quadratic air resistance.
+A Python-based numerical simulation of projectile motion with air resistance.
 # Numerical Projectile Motion Simulation
 
 This repository contains a Python-based numerical simulation of two-dimensional projectile motion, comparing ideal motion (no air resistance) with motion including linear and quadratic drag.
@@ -22,7 +22,7 @@ A fourth-order Runge–Kutta (RK4) integrator is used to solve the coupled diffe
 ## Features
 
 * Ideal (no-drag) projectile motion
-* Linear and quadratic air resistance models
+* Air resistance models
 * Adjustable physical parameters (mass, drag coefficient, timestep, launch angle)
 * Numerical integration using RK4
 * Automatic detection of ground impact
