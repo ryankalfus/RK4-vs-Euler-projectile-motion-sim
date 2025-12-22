@@ -34,13 +34,6 @@ A fourth-order Runge–Kutta (RK4) integrator is used to solve the coupled diffe
 
 ---
 
-## Motivation
-
-This project was developed as an independent computational physics exercise while studying AP Physics 1.
-The goal was to explore how numerical methods can be used to model realistic motion and to study the effects of air resistance on projectile trajectories.
-
----
-
 ## Methods
 
 * Newton’s Second Law applied to 2D motion
