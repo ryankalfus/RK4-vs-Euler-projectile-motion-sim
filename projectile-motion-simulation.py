@@ -1,15 +1,14 @@
 # --- imports ---
 import numpy as np
 import matplotlib.pyplot as plt
-import ipywidgets as widgets
 from IPython.display import display, clear_output, HTML
 from matplotlib.animation import FuncAnimation
 
 # ----------------------------
 # Projectile Motion Simulator
-# With and Without Air Resistance
-# Toggle integrator (RK4/Euler) in Colab
-# + 2D ball animation with time overlay (mm:ss.hh)
+# Air resistance always ON (set by user)
+# Compare integrators: RK4 vs Euler
+# + 2D ball animation overlay with time overlay (mm:ss.hh)
 # ----------------------------
 
 # ---- Parameters you can change ----
@@ -34,13 +33,10 @@ k_quad = 0.5 * rho * Cd * A
 # Linear drag coefficient: a_drag = -(b/m)*v
 b_lin = 0.02                # kg/s (tweak this if using linear drag)
 
-dt = 0.001                  # time step (s)
+dt = 0.1                    # time step (s)
 t_max = 10.0                # max sim time (s)
 
 # ---- Helper functions ----
-def acceleration_no_drag(vx, vy):
-    return 0.0, -g
-
 def acceleration_with_drag(vx, vy):
     if use_quadratic_drag:
         v = np.hypot(vx, vy)
@@ -53,7 +49,6 @@ def acceleration_with_drag(vx, vy):
 
 # ---- Integrators ----
 def euler_step(state, dt, accel_func):
-    # state = [x, y, vx, vy]
     x, y, vx, vy = state
     ax, ay = accel_func(vx, vy)
 
@@ -65,7 +60,6 @@ def euler_step(state, dt, accel_func):
     return np.array([x_new, y_new, vx_new, vy_new], dtype=float)
 
 def rk4_step(state, dt, accel_func):
-    # state = [x, y, vx, vy]
     def f(s):
         x, y, vx, vy = s
         ax, ay = accel_func(vx, vy)
@@ -96,16 +90,15 @@ def simulate(accel_func, step_func):
         state = step_func(state, dt, accel_func)
         t += dt
 
-        # Stop when projectile hits the ground (y <= 0) after launch
         if state[1] < 0 and t > dt:
-            # Linear interpolation to estimate landing point nicely
             x_prev, y_prev = x_vals[-1], y_vals[-1]
             x_new, y_new = state[0], state[1]
-            frac = y_prev / (y_prev - y_new) if (y_prev - y_new) != 0 else 1.0
+            denom = (y_prev - y_new)
+            frac = (y_prev / denom) if denom != 0 else 1.0
+
             x_land = x_prev + frac * (x_new - x_prev)
             t_land = t_vals[-1] + frac * (t - t_vals[-1])
 
-            # store landing point
             t_vals.append(t_land)
             x_vals.append(x_land)
             y_vals.append(0.0)
@@ -122,7 +115,7 @@ def simulate(accel_func, step_func):
     return (np.array(t_vals), np.array(x_vals), np.array(y_vals),
             np.array(vx_vals), np.array(vy_vals))
 
-# ---- Animation helper (2D ball + time overlay) ----
+# ---- Animation helpers ----
 def format_mm_ss_hh(seconds_float):
     total_hundredths = int(round(seconds_float * 100))
     minutes = total_hundredths // (60 * 100)
@@ -131,32 +124,39 @@ def format_mm_ss_hh(seconds_float):
     hundredths = rem % 100
     return f"{minutes:02d}:{secs:02d}.{hundredths:02d}"
 
-def trajectory_ball_animation(t_vals, x_vals, y_vals, title):
-    # Downsample for speed (aim ~400 frames)
-    n = len(t_vals)
-    step = max(1, n // 400)
-    t_ds = t_vals[::step]
-    x_ds = x_vals[::step]
-    y_ds = y_vals[::step]
+def overlay_ball_animation(t_rk, x_rk, y_rk, t_eu, x_eu, y_eu, title="RK4 vs Euler"):
+    # Downsample each to ~400 frames
+    def downsample(t, x, y, target=400):
+        n = len(t)
+        step = max(1, n // target)
+        return t[::step], x[::step], y[::step]
+
+    tR, xR, yR = downsample(t_rk, x_rk, y_rk)
+    tE, xE, yE = downsample(t_eu, x_eu, y_eu)
+
+    # Drive frames by the shorter one (keeps indexing safe)
+    frames = min(len(tR), len(tE))
 
     fig, ax = plt.subplots()
 
-    # Show just the motion (no "graph look")
     ax.set_axis_off()
     ax.set_aspect("equal", adjustable="box")
 
-    # Limits with padding
-    x_max = float(np.max(x_ds)) if len(x_ds) else 1.0
-    y_max = float(np.max(y_ds)) if len(y_ds) else 1.0
+    # Combined limits + padding
+    x_max = float(max(np.max(xR), np.max(xE))) if frames else 1.0
+    y_max = float(max(np.max(yR), np.max(yE))) if frames else 1.0
     ax.set_xlim(-0.05 * x_max, 1.05 * x_max)
     ax.set_ylim(-0.10 * max(1.0, y_max), 1.10 * max(1.0, y_max))
 
-    # Ground line (comment this out if you want a totally blank background)
+    # Ground line
     ax.plot([ax.get_xlim()[0], ax.get_xlim()[1]], [0, 0], linewidth=2)
 
-    # Ball + (optional) faint trail
-    trail, = ax.plot([], [], linewidth=2, alpha=0.35)
-    ball, = ax.plot([], [], marker="o", markersize=14)
+    # Two trails + two balls (matplotlib picks different default colors)
+    trail_rk, = ax.plot([], [], linewidth=2, alpha=0.35, label="RK4")
+    trail_eu, = ax.plot([], [], linewidth=2, alpha=0.35, label="Euler")
+
+    ball_rk, = ax.plot([], [], marker="o", markersize=14, label="RK4")
+    ball_eu, = ax.plot([], [], marker="o", markersize=14, label="Euler")
 
     # Time overlay (top-left)
     time_text = ax.text(
@@ -164,123 +164,113 @@ def trajectory_ball_animation(t_vals, x_vals, y_vals, title):
         fontsize=14, va="top"
     )
 
-    # Title overlay (top-center) - optional
+    # Title overlay (top-center)
     title_text = ax.text(
         0.5, 0.98, title, transform=ax.transAxes,
         fontsize=14, va="top", ha="center"
     )
 
+    # Leave space at bottom for a non-overlapping key
+    fig.subplots_adjust(bottom=0.14)
+
+    # Key at bottom-left (outside axes so it won't overlap animation)
+    legend = ax.legend(
+        loc="upper left",
+        bbox_to_anchor=(0.0, -0.10),   # bottom-left margin area
+        frameon=True,
+        ncol=1,
+        handlelength=2.0,
+        borderaxespad=0.0
+    )
+    legend.set_title("Key (color → method)")
+
     def init():
-        trail.set_data([], [])
-        ball.set_data([], [])
+        trail_rk.set_data([], [])
+        trail_eu.set_data([], [])
+        ball_rk.set_data([], [])
+        ball_eu.set_data([], [])
         time_text.set_text("")
-        return trail, ball, time_text, title_text
+        return trail_rk, trail_eu, ball_rk, ball_eu, time_text, title_text
 
     def update(i):
-        # trail up to i
-        trail.set_data(x_ds[:i+1], y_ds[:i+1])
-        # ball at i
-        ball.set_data([x_ds[i]], [y_ds[i]])
-        # time overlay
-        time_text.set_text(f"t = {format_mm_ss_hh(t_ds[i])}")
-        return trail, ball, time_text, title_text
+        trail_rk.set_data(xR[:i+1], yR[:i+1])
+        trail_eu.set_data(xE[:i+1], yE[:i+1])
+
+        ball_rk.set_data([xR[i]], [yR[i]])
+        ball_eu.set_data([xE[i]], [yE[i]])
+
+        # Use RK4 time for display (both use same dt typically, but this is safest)
+        time_text.set_text(f"t = {format_mm_ss_hh(tR[i])}")
+        return trail_rk, trail_eu, ball_rk, ball_eu, time_text, title_text
 
     ani = FuncAnimation(
-        fig, update, frames=len(t_ds),
+        fig, update, frames=frames,
         init_func=init, interval=20, blit=True
     )
 
-    plt.close(fig)  # avoids duplicate static image in Colab
+    plt.close(fig)
     return HTML(ani.to_jshtml())
 
 # ==========================
-# Colab dropdown toggle
+# Run once: RK4 vs Euler (drag always ON)
 # ==========================
 
-method_dropdown = widgets.Dropdown(
-    options=[("RK4", "rk4"), ("Euler", "euler")],
-    value="rk4",
-    description="Integrator:"
-)
+clear_output(wait=True)
 
-def run_selected_method(change=None):
-    clear_output(wait=True)
-    display(method_dropdown)
+t_rk, x_rk, y_rk, vx_rk, vy_rk = simulate(acceleration_with_drag, rk4_step)
+t_eu, x_eu, y_eu, vx_eu, vy_eu = simulate(acceleration_with_drag, euler_step)
 
-    # Choose integrator
-    if method_dropdown.value == "euler":
-        stepper = euler_step
-        method_label = "Euler"
-    else:
-        stepper = rk4_step
-        method_label = "RK4"
-
-    # ---- Run simulations (both cases) ----
-    t_n, x_n, y_n, vx_n, vy_n = simulate(acceleration_no_drag, stepper)
-    t_d, x_d, y_d, vx_d, vy_d = simulate(acceleration_with_drag, stepper)
-
-    # ---- Quick stats ----
-    range_n = x_n[-1]
-    range_d = x_d[-1]
-    maxh_n = y_n.max()
-    maxh_d = y_d.max()
-    time_n = t_n[-1]
-    time_d = t_d[-1]
-
-    print(f"Integrator: {method_label}")
-    print("No drag:")
-    print(f"  Range: {range_n:.2f} m | Max height: {maxh_n:.2f} m | Time: {time_n:.2f} s")
-    print("With drag:")
-    print(f"  Range: {range_d:.2f} m | Max height: {maxh_d:.2f} m | Time: {time_d:.2f} s")
-
-    # ---- Original plots ----
-    # 1) Trajectory
-    plt.figure()
-    plt.plot(x_n, y_n, label="No air resistance")
-    plt.plot(x_d, y_d, label="With air resistance")
-    plt.xlabel("x (m)")
-    plt.ylabel("y (m)")
-    plt.title(f"Projectile Trajectory ({method_label})")
-    plt.legend()
-    plt.grid(True)
-    plt.show()
-
-    # 2) Speed vs time
-    speed_n = np.hypot(vx_n, vy_n)
-    speed_d = np.hypot(vx_d, vy_d)
-
-    plt.figure()
-    plt.plot(t_n, speed_n, label="No air resistance")
-    plt.plot(t_d, speed_d, label="With air resistance")
-    plt.xlabel("time (s)")
-    plt.ylabel("speed (m/s)")
-    plt.title(f"Speed vs Time ({method_label})")
-    plt.legend()
-    plt.grid(True)
-    plt.show()
-
-    # 3) Height vs time
-    plt.figure()
-    plt.plot(t_n, y_n, label="No air resistance")
-    plt.plot(t_d, y_d, label="With air resistance")
-    plt.xlabel("time (s)")
-    plt.ylabel("height y (m)")
-    plt.title(f"Height vs Time ({method_label})")
-    plt.legend()
-    plt.grid(True)
-    plt.show()
-
-    # ---- New: 2D "ball" animations with time overlay ----
-    display(trajectory_ball_animation(t_d, x_d, y_d, f"With Drag — {method_label}"))
-    display(trajectory_ball_animation(t_n, x_n, y_n, f"No Drag — {method_label}"))
-
-    global LAST_RESULTS
-    LAST_RESULTS = {
-        "method": method_label,
-        "no_drag": (t_n, x_n, y_n),
-        "drag": (t_d, x_d, y_d)
+def summarize(t_vals, x_vals, y_vals):
+    return {
+        "Range (m)": float(x_vals[-1]),
+        "Max height (m)": float(np.max(y_vals)),
+        "Time (s)": float(t_vals[-1]),
     }
 
-# Re-run when dropdown changes
-method_dropdown.observe(run_selected_method, names="value")
-run_selected_method()
+stats_rk = summarize(t_rk, x_rk, y_rk)
+stats_eu = summarize(t_eu, x_eu, y_eu)
+
+print("Integrator comparison (same air resistance settings)")
+print(f"RK4:   Range: {stats_rk['Range (m)']:.2f} m | Max height: {stats_rk['Max height (m)']:.2f} m | Time: {stats_rk['Time (s)']:.2f} s")
+print(f"Euler: Range: {stats_eu['Range (m)']:.2f} m | Max height: {stats_eu['Max height (m)']:.2f} m | Time: {stats_eu['Time (s)']:.2f} s")
+
+plt.figure()
+plt.plot(x_rk, y_rk, label="RK4")
+plt.plot(x_eu, y_eu, label="Euler")
+plt.xlabel("x (m)")
+plt.ylabel("y (m)")
+plt.title("Projectile Trajectory (RK4 vs Euler)")
+plt.legend()
+plt.grid(True)
+plt.show()
+
+speed_rk = np.hypot(vx_rk, vy_rk)
+speed_eu = np.hypot(vx_eu, vy_eu)
+
+plt.figure()
+plt.plot(t_rk, speed_rk, label="RK4")
+plt.plot(t_eu, speed_eu, label="Euler")
+plt.xlabel("time (s)")
+plt.ylabel("speed (m/s)")
+plt.title("Speed vs Time (RK4 vs Euler)")
+plt.legend()
+plt.grid(True)
+plt.show()
+
+plt.figure()
+plt.plot(t_rk, y_rk, label="RK4")
+plt.plot(t_eu, y_eu, label="Euler")
+plt.xlabel("time (s)")
+plt.ylabel("height y (m)")
+plt.title("Height vs Time (RK4 vs Euler)")
+plt.legend()
+plt.grid(True)
+plt.show()
+
+# Single overlay animation (RK4 + Euler)
+display(overlay_ball_animation(t_rk, x_rk, y_rk, t_eu, x_eu, y_eu, "RK4 vs Euler"))
+
+LAST_RESULTS = {
+    "rk4": (t_rk, x_rk, y_rk, vx_rk, vy_rk),
+    "euler": (t_eu, x_eu, y_eu, vx_eu, vy_eu),
+}
