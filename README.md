@@ -1,100 +1,133 @@
-# Numerical Projectile Motion Simulation: RK4 vs Euler Comparison
-A Python-based numerical simulation of projectile motion with interactive visualization comapring RK4 and Euler time-step integrations. Parameters such as mass, drag, initial velocity, initial height, and more can be interacted with.
+# Numerical Projectile Motion Simulation: RK4 vs Euler (with Optional Closed-Form Reference)
+
+A Python-based numerical simulation of 2D projectile motion with visualization comparing **RK4** and **Euler** time-stepping. The simulation supports **quadratic drag** (default) and a **no-drag mode**. When drag is turned **off**, the project additionally plots the **closed-form analytical solution** as a third curve for direct validation of the numerical integrators.
 
 ---
 
 ## Overview
 
-This project numerically simulates two-dimensional projectile motion **with air resistance enabled**, focusing on a direct comparison between numerical integration methods.
+This project simulates two-dimensional projectile motion and compares two numerical integration methods on the **same physical system** (same initial conditions, same timestep, same force model):
 
-The same physical system (same drag model, timestep, and initial conditions) is solved using:
+- **Fourth-order Runge–Kutta (RK4)**
+- **Forward Euler integration**
 
-* **Fourth-order Runge–Kutta (RK4)**
-* **Forward Euler integration**
+### Two physics modes
 
-This allows clear visualization of numerical accuracy, stability, and error accumulation between integrators when applied to a non-linear dynamical system with drag.
+- **Quadratic drag ON** (`use_quadratic_drag = True`)
+  - The motion is non-linear and (in general) **does not have a closed-form solution** for position vs time.
+  - Only RK4 and Euler are shown.
+
+- **No drag** (`use_quadratic_drag = False`)
+  - The motion reduces to standard constant-acceleration projectile motion with a **closed-form analytical solution**.
+  - RK4 and Euler are shown **alongside** the analytical solution as a third curve.
 
 ---
 
 ## Features
 
-* Projectile motion with air resistance (always enabled)
-* Air resistance models:
-  * Quadratic drag (default)
-  * Linear drag (optional via parameter toggle)
-* Fixed physical parameters for controlled comparison
-* Numerical integration methods:
-  * Fourth-order Runge–Kutta (RK4)
-  * Forward Euler
-* Direct integrator comparison:
-  * Identical initial conditions and timestep
-  * Identical force model
-* Automatic ground-impact detection with linear interpolation
-* Static visualizations:
-  * Trajectory comparison (RK4 vs Euler)
-  * Speed vs time (RK4 vs Euler)
-  * Height vs time (RK4 vs Euler)
-* Animated visualization:
-  * Overlayed 2D projectile motion
-  * RK4 and Euler shown simultaneously
-  * Fading trajectory trails
-  * Time overlay formatted as **mm:ss.hh**
-  * Color-coded integrator key
+### Physics and simulation
+- 2D projectile motion under gravity
+- Toggleable drag model:
+  - **Quadratic drag** (default)
+  - **No drag** (set `use_quadratic_drag = False`)
+- Fixed timestep integration
+- Automatic ground-impact detection with **linear interpolation** for more accurate landing time/range
+
+### Numerical methods
+- Forward Euler (first order)
+- RK4 (fourth order)
+
+### Visualizations
+Static plots always included:
+- **Trajectory** (x vs y)
+- **Speed vs time**
+- **Height vs time**
+
+Additional analytical validation (only when drag is OFF):
+- The above three plots include a **third curve**: **Analytical (closed-form)**
+
+Animated overlay visualization:
+- 2D animation with fading trails and mm:ss.hh time overlay
+- Shows:
+  - RK4 vs Euler when drag is ON
+  - RK4 vs Euler vs Analytical when drag is OFF
+
+### Error analysis (numerical self-consistency)
+- **Error vs time**: position error relative to a higher-resolution RK4 reference run
+- **Error vs timestep size** (log-log): maximum position error over the run as `dt` is varied
 
 ---
 
 ## Methods
 
-* Newton’s Second Law applied to two-dimensional motion with drag
-* Coupled first-order ordinary differential equations
-* Numerical time integration using:
-  * Fourth-order Runge–Kutta (RK4)
-  * Forward Euler method
-* Fixed timestep integration
-* Non-linear drag force (quadratic or linear)
-* Ground-impact event detection using linear interpolation
-* Side-by-side numerical comparison of integration accuracy
+- Newton’s Second Law in 2D
+- ODE system in first-order form:
+  - state = (x, y, vx, vy)
+- Integration methods:
+  - Forward Euler
+  - RK4
+- Force model:
+  - Quadratic drag (if enabled): acceleration depends on speed and direction
+  - No drag (if disabled): acceleration is constant (ax = 0, ay = −g)
+- Ground-impact event detection:
+  - Stops when y crosses below 0
+  - Interpolates between the last two points to estimate landing time/range more accurately
+
+---
+
+## Why the analytical curve only appears with drag OFF
+
+Projectile motion **without drag** has a standard closed-form solution for:
+- x(t), y(t)
+- vx(t), vy(t)
+
+However, when **quadratic drag** is enabled, the equations become **nonlinear** and generally **do not have a closed-form solution** for position vs time. Because of this, the analytical curve is only plotted and animated when drag is disabled (`use_quadratic_drag = False`).
 
 ---
 
 ## Requirements
 
-* Python 3
-* NumPy
-* Matplotlib
-* ipywidgets (for interactive controls)
-* Jupyter Notebook or Google Colab (recommended)
+- Python 3
+- NumPy
+- Matplotlib
+- Jupyter Notebook or Google Colab (recommended)
+
+*(If you run this inside a notebook environment, the animation display is embedded.)*
 
 ---
 
 ## Usage
 
 1. Open the notebook in Jupyter or Google Colab.
-2. Adjust physical parameters (launch angle, speed, drag model, timestep).
-3. Run the notebook to:
-   * Compare RK4 and Euler trajectories under identical conditions
-   * Observe numerical error accumulation
-   * View static plots and a combined overlay animation
+2. Set parameters near the top:
+   - `theta_deg`, `v0`, `y0`, `dt`, etc.
+3. Choose the physics mode:
+   - Drag ON: `use_quadratic_drag = True`
+   - Drag OFF (enables analytical reference): `use_quadratic_drag = False`
+4. Run the notebook to generate:
+   - Trajectory, speed vs time, height vs time plots
+   - Error plots (error vs time, error vs timestep size)
+   - Overlay animation
+
+---
+
+## Interpreting results
+
+- With **drag ON**, RK4 and Euler will diverge increasingly over time because Euler accumulates more numerical error and is less stable for nonlinear dynamics.
+- With **drag OFF**, the **analytical closed-form curve** provides a direct correctness check:
+  - RK4 should track very closely for moderate dt
+  - Euler will deviate noticeably unless dt is made small
+
+The error plots provide quantitative evidence of accuracy and timestep sensitivity.
 
 ---
 
 ## Possible Extensions
 
-* Adaptive timestep methods
-* Energy conservation and numerical error analysis
-* Additional integrators (Verlet, midpoint, symplectic methods)
-* Quantitative comparison of Euler vs RK4 error
-* Experimental validation with real projectile data
+- Add additional integrators (midpoint, Verlet, symplectic methods)
+- Estimate convergence slopes from the log-log timestep plot
+- Add adaptive timestep control
+- Compare against experimental data
+- Track conserved quantities in the no-drag case (e.g., mechanical energy) and quantify drift
 
 ---
-
-## Motivation
-
-Projectile motion with air resistance has no closed-form analytical solution.  
-This makes it an ideal test case for comparing numerical integration methods.
-
-By keeping the physical system fixed and varying only the integrator, this project highlights:
-* Stability differences
-* Error accumulation
-* The limitations of first-order methods
-* The advantages of higher-order schemes for non-linear dynamics
